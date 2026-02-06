@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
@@ -9,8 +10,15 @@ import EventDetails from './pages/EventDetails';
 import UserDashboard from './pages/UserDashboard';
 import ListerDashboard from './pages/ListerDashboard';
 import Events from './pages/Events';
+import useAuthStore from './store/authStore';
 
 function App() {
+  const initializeAuth = useAuthStore((state) => state.initializeAuth);
+
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
+
   return (
     <Router>
       <Routes>

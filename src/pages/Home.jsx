@@ -1,14 +1,24 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import EventCard from '../components/events/EventCard';
 import EventFilters from '../components/events/EventFilters';
 import useEventsStore from '../store/eventsStore';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Skeleton from '../components/ui/Skeleton';
+import useAuthStore from '../store/authStore';
 
 const Home = () => {
   const events = useEventsStore((state) => state.events);
   const filters = useEventsStore((state) => state.filters);
-  const [loading] = useState(false);
+  const loading = useEventsStore((state) => state.loading);
+  const fetchEvents = useEventsStore((state) => state.fetchEvents);
+  const authLoading = useAuthStore((s) => s.loading);
+  const user = useAuthStore((s) => s.user);
+
+  useEffect(() => {
+    // Always fetch events from Supabase (public view, no auth required)
+    // Supabase is the source of truth - no cache, no localStorage
+    fetchEvents();
+  }, [fetchEvents]);
 
   const filteredEvents = useMemo(() => {
     let filtered = [...events];

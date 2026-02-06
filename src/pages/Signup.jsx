@@ -5,12 +5,15 @@ import useAuthStore from '../store/authStore';
 import { showToast } from '../utils/toast';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 const Signup = () => {
   const navigate = useNavigate();
-  const login = useAuthStore((state) => state.login);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const profile = useAuthStore((state) => state.profile);
+  const loading = useAuthStore((state) => state.loading);
   const user = useAuthStore((state) => state.user);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const {
     register,
     handleSubmit,
@@ -22,31 +25,33 @@ const Signup = () => {
 
   const password = watch('password');
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (use role from profile or user metadata)
   useEffect(() => {
-    if (isAuthenticated) {
-      const redirectPath = user?.role === 'lister' ? '/lister/dashboard' : '/dashboard';
-      navigate(redirectPath, { replace: true });
-    }
-  }, [isAuthenticated, user, navigate]);
+    if (!isAuthenticated || loading) return;
+    const effectiveRole = profile?.role || user?.user_metadata?.role;
+    if (!effectiveRole) return;
+    navigate(effectiveRole === 'lister' ? '/lister/dashboard' : '/dashboard', { replace: true });
+  }, [isAuthenticated, profile, user, loading, navigate]);
 
-  const onSubmit = (data) => {
-    // Mock signup - in real app, this would be an API call
-    const newUser = {
-      id: Date.now().toString(),
-      name: data.name,
-      email: data.email,
-      role: role,
-    };
+  const onSubmit = async (data) => {
+    setIsSubmitting(true);
+    try {
+      const signUp = useAuthStore.getState().signUp;
+      const result = await signUp(data.email, data.password, data.name, role);
 
-    login(newUser);
-    showToast('Account created successfully!', 'success');
-    
-    // Role-based redirect
-    if (role === 'lister') {
-      navigate('/lister/dashboard', { replace: true });
-    } else {
-      navigate('/dashboard', { replace: true });
+      if (result.success) {
+        if (result.requiresEmailConfirmation) {
+          showToast('Account created! Please check your email to confirm, then sign in.', 'success');
+          navigate('/login', { replace: true });
+        } else {
+          showToast('Account created successfully!', 'success');
+          // Do not navigate here; let the auth effect redirect after authLoading completes
+        }
+      } else {
+        showToast(result.error || 'Signup failed. Please try again.', 'error');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -139,8 +144,8 @@ const Signup = () => {
           </div>
 
           <div>
-            <Button type="submit" className="w-full" size="lg">
-              Sign up
+            <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
+              {isSubmitting ? <LoadingSpinner size="sm" /> : 'Sign up'}
             </Button>
           </div>
         </form>

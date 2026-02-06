@@ -1,16 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import useAuthStore from '../store/authStore';
 import { showToast } from '../utils/toast';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 const Login = () => {
   const navigate = useNavigate();
-  const login = useAuthStore((state) => state.login);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const profile = useAuthStore((state) => state.profile);
   const user = useAuthStore((state) => state.user);
+  const loading = useAuthStore((state) => state.loading);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const {
     register,
     handleSubmit,
@@ -19,30 +22,25 @@ const Login = () => {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated) {
-      const redirectPath = user?.role === 'lister' ? '/lister/dashboard' : '/dashboard';
-      navigate(redirectPath, { replace: true });
-    }
-  }, [isAuthenticated, user, navigate]);
+    if (!isAuthenticated) return;
+    const effectiveRole = profile?.role || user?.user_metadata?.role || 'user';
+    navigate(effectiveRole === 'lister' ? '/lister/dashboard' : '/dashboard', { replace: true });
+  }, [isAuthenticated, profile, user, navigate]);
 
-  const onSubmit = (data) => {
-    // Mock authentication - in real app, this would be an API call
-    const mockUsers = {
-      user: { id: '1', name: 'John Doe', email: data.email, role: 'user' },
-      lister: { id: '2', name: 'Jane Smith', email: data.email, role: 'lister' },
-    };
+  const onSubmit = async (data) => {
+    setIsSubmitting(true);
+    try {
+      const signIn = useAuthStore.getState().signIn;
+      const result = await signIn(data.email, data.password);
 
-    // Simple mock: if email contains 'lister', login as lister
-    const user = data.email.includes('lister') ? mockUsers.lister : mockUsers.user;
-    
-    login(user);
-    showToast('Login successful!', 'success');
-    
-    // Role-based redirect
-    if (user.role === 'lister') {
-      navigate('/lister/dashboard', { replace: true });
-    } else {
-      navigate('/dashboard', { replace: true });
+      if (result.success) {
+        showToast('Login successful!', 'success');
+        // Do not navigate here; let the auth effect redirect after authLoading completes
+      } else {
+        showToast(result.error || 'Login failed. Please check your credentials.', 'error');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -89,16 +87,9 @@ const Login = () => {
           </div>
 
           <div>
-            <Button type="submit" className="w-full" size="lg">
-              Sign in
+            <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
+              {isSubmitting ? <LoadingSpinner size="sm" /> : 'Sign in'}
             </Button>
-          </div>
-
-          <div className="text-sm text-gray-600 bg-gray-100 p-4 rounded-lg">
-            <p className="font-semibold mb-2">Demo Credentials:</p>
-            <p>User: any email (e.g., user@example.com)</p>
-            <p>Lister: email containing "lister" (e.g., lister@example.com)</p>
-            <p>Password: any password (min 6 chars)</p>
           </div>
         </form>
       </div>

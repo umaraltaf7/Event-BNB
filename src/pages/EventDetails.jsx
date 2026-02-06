@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DateRange } from 'react-date-range';
 import 'react-date-range/dist/styles.css';
@@ -16,9 +16,12 @@ const EventDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
+  const profile = useAuthStore((state) => state.profile);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const getEventById = useEventsStore((state) => state.getEventById);
   const { addBooking, hasBooking } = useBookingsStore();
+  const [event, setEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [bookingDate, setBookingDate] = useState({
@@ -27,7 +30,23 @@ const EventDetails = () => {
     key: 'selection',
   });
 
-  const event = getEventById(id);
+  useEffect(() => {
+    const loadEvent = async () => {
+      setLoading(true);
+      const eventData = await getEventById(id);
+      setEvent(eventData);
+      setLoading(false);
+    };
+    loadEvent();
+  }, [id, getEventById]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   if (!event) {
     return (
@@ -47,7 +66,7 @@ const EventDetails = () => {
       return;
     }
 
-    if (user.role !== 'user') {
+    if (profile?.role !== 'user') {
       showToast('Only users can book events', 'error');
       return;
     }
@@ -55,25 +74,32 @@ const EventDetails = () => {
     setShowBookingModal(true);
   };
 
-  const confirmBooking = () => {
-    if (hasBooking(user.id, event.id, bookingDate.startDate.toISOString().split('T')[0])) {
+  const confirmBooking = async () => {
+    if (!user || !event) return;
+
+    const bookingDateStr = bookingDate.startDate.toISOString().split('T')[0];
+    
+    // Check if already booked
+    const alreadyBooked = await hasBooking(user.id, event.id, bookingDateStr);
+    if (alreadyBooked) {
       showToast('You have already booked this event for this date', 'error');
       return;
     }
 
-    addBooking({
-      userId: user.id,
+    // Add booking
+    const result = await addBooking({
       eventId: event.id,
-      eventTitle: event.title,
-      eventImage: event.images[0],
-      date: bookingDate.startDate.toISOString().split('T')[0],
+      date: bookingDateStr,
       price: event.price,
-      status: 'confirmed',
     });
 
-    showToast('Event booked successfully!', 'success');
-    setShowBookingModal(false);
-    navigate('/dashboard');
+    if (result.success) {
+      showToast('Event booked successfully!', 'success');
+      setShowBookingModal(false);
+      navigate('/dashboard');
+    } else {
+      showToast(result.error || 'Failed to book event', 'error');
+    }
   };
 
   const formatDate = (dateString) => {
@@ -157,11 +183,11 @@ const EventDetails = () => {
                 onClick={handleBookEvent}
                 className="w-full"
                 size="lg"
-                disabled={!isAuthenticated || user?.role !== 'user'}
+                disabled={!isAuthenticated || profile?.role !== 'user'}
               >
                 {!isAuthenticated
                   ? 'Login to Book'
-                  : user?.role !== 'user'
+                  : profile?.role !== 'user'
                   ? 'Only Users Can Book'
                   : 'Book Event'}
               </Button>

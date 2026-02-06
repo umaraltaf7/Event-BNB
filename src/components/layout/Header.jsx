@@ -4,13 +4,14 @@ import Button from '../ui/Button';
 
 const Header = () => {
   const user = useAuthStore((state) => state.user);
+  const profile = useAuthStore((state) => state.profile);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const logout = useAuthStore((state) => state.logout);
+  const signOut = useAuthStore((state) => state.signOut);
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/login', { replace: true });
   };
 
   const navLinkClass = ({ isActive }) =>
@@ -35,18 +36,18 @@ const Header = () => {
             </NavLink>
             {isAuthenticated && (
               <>
-                {user?.role === 'user' && (
+                {profile?.role === 'user' && (
                   <NavLink to="/dashboard" className={navLinkClass}>
                     My Bookings
                   </NavLink>
                 )}
-                {user?.role === 'lister' && (
+                {profile?.role === 'lister' && (
                   <NavLink to="/lister/dashboard" className={navLinkClass}>
                     Dashboard
                   </NavLink>
                 )}
                 <div className="flex items-center space-x-4">
-                  <span className="text-gray-700">Hi, {user?.name}</span>
+                  <span className="text-gray-700">Hi, {profile?.name || user?.email}</span>
                   <Button variant="outline" size="sm" onClick={handleLogout}>
                     Logout
                   </Button>
